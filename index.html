@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Forex Margin Calculator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f5f5f5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        .calculator {
+            background: #fff;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+            width: 360px;
+        }
+
+        h2 {
+            text-align: center;
+            color: #333;
+        }
+
+        label {
+            display: block;
+            margin: 12px 0 6px;
+            color: #555;
+            font-weight: bold;
+        }
+
+        select,
+        input,
+        button {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        button {
+            background: #007bff;
+            color: #fff;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+            transition: 0.2s;
+        }
+
+        button:hover {
+            background: #0056b3;
+        }
+
+        .result,
+        .error {
+            margin-top: 15px;
+            padding: 12px;
+            border-radius: 6px;
+        }
+
+        .result {
+            background: #e7f7ed;
+            color: #0a6b2c;
+            font-weight: bold;
+        }
+
+        .error {
+            background: #fdeaea;
+            color: #b30000;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="calculator">
+        <h2>Forex Margin Calculator</h2>
+
+        <label for="pair">Currency Pair:</label>
+        <select id="pair">
+            <option value="EUR/USD">EUR/USD</option>
+            <option value="GBP/USD">GBP/USD</option>
+            <option value="USD/JPY">USD/JPY</option>
+            <option value="AUD/USD">AUD/USD</option>
+            <option value="USD/CAD">USD/CAD</option>
+            <option value="NZD/USD">NZD/USD</option>
+            <option value="GBP/JPY">GBP/JPY</option>
+            <option value="EUR/JPY">EUR/JPY</option>
+            <option value="EUR/GBP">EUR/GBP</option>
+            <option value="USD/CHF">USD/CHF</option>
+            <option value="AUD/JPY">AUD/JPY</option>
+            <option value="EUR/AUD">EUR/AUD</option>
+            <option value="GBP/CAD">GBP/CAD</option>
+            <option value="EUR/CAD">EUR/CAD</option>
+            <option value="CHF/JPY">CHF/JPY</option>
+            <option value="CAD/JPY">CAD/JPY</option>
+            <option value="NZD/JPY">NZD/JPY</option>
+            <option value="AUD/CAD">AUD/CAD</option>
+            <option value="GBP/AUD">GBP/AUD</option>
+            <option value="NZD/CAD">NZD/CAD</option>
+        </select>
+
+        <label for="lotSize">Lot Size (standard lots):</label>
+        <input type="number" id="lotSize" placeholder="e.g. 1" step="0.01">
+
+        <label for="leverage">Leverage (e.g. 100):</label>
+        <input type="number" id="leverage" placeholder="e.g. 100">
+
+        <button onclick="calculateMargin()">Calculate Margin</button>
+
+        <div id="output"></div>
+    </div>
+
+    <script>
+        async function calculateMargin() {
+            const pair = document.getElementById("pair").value;
+            const lotSize = parseFloat(document.getElementById("lotSize").value);
+            const leverage = parseInt(document.getElementById("leverage").value);
+            const output = document.getElementById("output");
+
+            if (!lotSize || !leverage || lotSize <= 0 || leverage <= 0) {
+                output.innerHTML = `<div class="error">Please enter valid values.</div>`;
+                return;
+            }
+
+            const [base, quote] = pair.split("/");
+
+            try {
+                let res = await fetch(
+                    `https://api.exchangerate.host/latest?base=${base}&symbols=${quote}`
+                );
+                let data = await res.json();
+
+                let rate = null;
+
+                if (data.success && data.rates[quote]) {
+                    rate = data.rates[quote]; // direct rate found
+                } else {
+                    // Try inverse
+                    res = await fetch(
+                        `https://api.exchangerate.host/latest?base=${quote}&symbols=${base}`
+                    );
+                    data = await res.json();
+
+                    if (data.success && data.rates[base]) {
+                        rate = 1 / data.rates[base];
+                    }
+                }
+
+                if (!rate) {
+                    output.innerHTML = `<div class="error">Could not fetch rate for ${pair}</div>`;
+                    return;
+                }
+
+                const units = lotSize * 100000;
+                const margin = (units * rate) / leverage;
+
+                output.innerHTML = `
+          <div class="result">
+            <strong>Required Margin:</strong> ${margin.toFixed(2)} ${quote}<br>
+            <small>Rate used: 1 ${base} = ${rate.toFixed(5)} ${quote}</small>
+          </div>
+        `;
+            } catch (err) {
+                output.innerHTML = `<div class="error">API request failed. Try again later.</div>`;
+            }
+        }
+    </script>
+</body>
+
+</html>
