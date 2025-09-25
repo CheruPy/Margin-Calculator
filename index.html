@@ -7,110 +7,80 @@
     <style>
         body {
             font-family: Arial, sans-serif;
-            background: #f5f5f5;
+            background: #f4f4f4;
             display: flex;
             justify-content: center;
             align-items: center;
-            height: 100vh;
+            min-height: 100vh;
         }
 
         .calculator {
             background: #fff;
-            padding: 25px;
-            border-radius: 12px;
-            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
-            width: 360px;
+            padding: 20px;
+            border-radius: 10px;
+            width: 350px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
         }
 
-        h2 {
-            text-align: center;
-            color: #333;
-        }
-
-        label {
-            display: block;
-            margin: 12px 0 6px;
-            color: #555;
-            font-weight: bold;
-        }
-
-        select,
         input,
+        select,
         button {
             width: 100%;
             padding: 10px;
-            margin-bottom: 12px;
-            border: 1px solid #ddd;
-            border-radius: 6px;
-            font-size: 14px;
+            margin: 8px 0;
+            border-radius: 5px;
+            border: 1px solid #ccc;
         }
 
         button {
-            background: #007bff;
+            background: #0073e6;
             color: #fff;
-            border: none;
-            cursor: pointer;
             font-weight: bold;
-            transition: 0.2s;
+            cursor: pointer;
+            border: none;
         }
 
         button:hover {
-            background: #0056b3;
+            background: #005bb5;
         }
 
         .result,
         .error {
             margin-top: 15px;
-            padding: 12px;
-            border-radius: 6px;
+            padding: 10px;
+            border-radius: 5px;
         }
 
         .result {
-            background: #e7f7ed;
-            color: #0a6b2c;
-            font-weight: bold;
+            background: #e9f7ef;
+            border-left: 5px solid #2ecc71;
         }
 
         .error {
-            background: #fdeaea;
-            color: #b30000;
+            background: #fdecea;
+            border-left: 5px solid #e74c3c;
         }
     </style>
 </head>
 
 <body>
     <div class="calculator">
-        <h2>Forex Margin Calculator</h2>
+        <h2>Forex Margin Calculator (Live Rates)</h2>
 
         <label for="pair">Currency Pair:</label>
         <select id="pair">
             <option value="EUR/USD">EUR/USD</option>
             <option value="GBP/USD">GBP/USD</option>
             <option value="USD/JPY">USD/JPY</option>
-            <option value="AUD/USD">AUD/USD</option>
-            <option value="USD/CAD">USD/CAD</option>
-            <option value="NZD/USD">NZD/USD</option>
             <option value="GBP/JPY">GBP/JPY</option>
-            <option value="EUR/JPY">EUR/JPY</option>
-            <option value="EUR/GBP">EUR/GBP</option>
             <option value="USD/CHF">USD/CHF</option>
-            <option value="AUD/JPY">AUD/JPY</option>
-            <option value="EUR/AUD">EUR/AUD</option>
-            <option value="GBP/CAD">GBP/CAD</option>
-            <option value="EUR/CAD">EUR/CAD</option>
-            <option value="CHF/JPY">CHF/JPY</option>
-            <option value="CAD/JPY">CAD/JPY</option>
-            <option value="NZD/JPY">NZD/JPY</option>
-            <option value="AUD/CAD">AUD/CAD</option>
-            <option value="GBP/AUD">GBP/AUD</option>
-            <option value="NZD/CAD">NZD/CAD</option>
         </select>
 
-        <label for="lotSize">Lot Size (standard lots):</label>
-        <input type="number" id="lotSize" placeholder="e.g. 1" step="0.01">
+        <label for="lotSize">Lot Size (e.g. 1, 0.1, 0.01):</label>
+        <input type="number" id="lotSize" step="0.01" value="1" required>
 
-        <label for="leverage">Leverage (e.g. 100):</label>
-        <input type="number" id="leverage" placeholder="e.g. 100">
+        <label for="leverage">Leverage (e.g. 100, 200, 500):</label>
+        <input type="number" id="leverage" value="100" required>
 
         <button onclick="calculateMargin()">Calculate Margin</button>
 
@@ -118,24 +88,6 @@
     </div>
 
     <script>
-        const apiKey = "YOUR_API_KEY"; // Replace with your Twelve Data API key
-
-        async function getRate(base, quote) {
-            const url = `https://api.twelvedata.com/price?symbol=${base}/${quote}&apikey=${apiKey}`;
-            try {
-                let res = await fetch(url);
-                let data = await res.json();
-
-                if (data.price) {
-                    return parseFloat(data.price);
-                } else {
-                    return null;
-                }
-            } catch (err) {
-                return null;
-            }
-        }
-
         async function calculateMargin() {
             const pair = document.getElementById("pair").value;
             const lotSize = parseFloat(document.getElementById("lotSize").value);
@@ -148,22 +100,31 @@
             }
 
             const [base, quote] = pair.split("/");
-            const rate = await getRate(base, quote);
 
-            if (!rate) {
-                output.innerHTML = `<div class="error">Could not fetch rate for ${pair}</div>`;
-                return;
+            try {
+                const res = await fetch(
+                    `https://api.exchangerate.host/latest?base=${base}&symbols=${quote}`
+                );
+                const data = await res.json();
+
+                if (!data.success || !data.rates[quote]) {
+                    output.innerHTML = `<div class="error">Could not fetch rate for ${pair}</div>`;
+                    return;
+                }
+
+                const rate = data.rates[quote];
+                const units = lotSize * 100000;
+                const margin = (units * rate) / leverage;
+
+                output.innerHTML = `
+          <div class="result">
+            <strong>Required Margin:</strong> ${margin.toFixed(2)} ${quote}<br>
+            <small>Rate used: 1 ${base} = ${rate} ${quote}</small>
+          </div>
+        `;
+            } catch (err) {
+                output.innerHTML = `<div class="error">API request failed. Try again later.</div>`;
             }
-
-            const units = lotSize * 100000; // standard lot size
-            const margin = (units * rate) / leverage;
-
-            output.innerHTML = `
-        <div class="result">
-          <strong>Required Margin:</strong> ${margin.toFixed(2)} ${quote}<br>
-          <small>Rate used: 1 ${base} = ${rate.toFixed(5)} ${quote}</small>
-        </div>
-      `;
         }
     </script>
 </body>
