@@ -118,6 +118,24 @@
     </div>
 
     <script>
+        const apiKey = "YOUR_API_KEY"; // Replace with your Twelve Data API key
+
+        async function getRate(base, quote) {
+            const url = `https://api.twelvedata.com/price?symbol=${base}/${quote}&apikey=${apiKey}`;
+            try {
+                let res = await fetch(url);
+                let data = await res.json();
+
+                if (data.price) {
+                    return parseFloat(data.price);
+                } else {
+                    return null;
+                }
+            } catch (err) {
+                return null;
+            }
+        }
+
         async function calculateMargin() {
             const pair = document.getElementById("pair").value;
             const lotSize = parseFloat(document.getElementById("lotSize").value);
@@ -130,46 +148,22 @@
             }
 
             const [base, quote] = pair.split("/");
+            const rate = await getRate(base, quote);
 
-            try {
-                let res = await fetch(
-                    `https://api.exchangerate.host/latest?base=${base}&symbols=${quote}`
-                );
-                let data = await res.json();
-
-                let rate = null;
-
-                if (data.success && data.rates[quote]) {
-                    rate = data.rates[quote]; // direct rate found
-                } else {
-                    // Try inverse
-                    res = await fetch(
-                        `https://api.exchangerate.host/latest?base=${quote}&symbols=${base}`
-                    );
-                    data = await res.json();
-
-                    if (data.success && data.rates[base]) {
-                        rate = 1 / data.rates[base];
-                    }
-                }
-
-                if (!rate) {
-                    output.innerHTML = `<div class="error">Could not fetch rate for ${pair}</div>`;
-                    return;
-                }
-
-                const units = lotSize * 100000;
-                const margin = (units * rate) / leverage;
-
-                output.innerHTML = `
-          <div class="result">
-            <strong>Required Margin:</strong> ${margin.toFixed(2)} ${quote}<br>
-            <small>Rate used: 1 ${base} = ${rate.toFixed(5)} ${quote}</small>
-          </div>
-        `;
-            } catch (err) {
-                output.innerHTML = `<div class="error">API request failed. Try again later.</div>`;
+            if (!rate) {
+                output.innerHTML = `<div class="error">Could not fetch rate for ${pair}</div>`;
+                return;
             }
+
+            const units = lotSize * 100000; // standard lot size
+            const margin = (units * rate) / leverage;
+
+            output.innerHTML = `
+        <div class="result">
+          <strong>Required Margin:</strong> ${margin.toFixed(2)} ${quote}<br>
+          <small>Rate used: 1 ${base} = ${rate.toFixed(5)} ${quote}</small>
+        </div>
+      `;
         }
     </script>
 </body>
